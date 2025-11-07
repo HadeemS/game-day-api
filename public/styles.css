@@ -1,0 +1,7 @@
+*{box-sizing:border-box} body{margin:0;font-family:system-ui,Arial;background:#fafafa}
+.wrap{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;padding:2rem;min-height:100vh}
+.panel{background:#fff;border-radius:16px;padding:2rem;box-shadow:0 10px 24px rgba(0,0,0,.06)}
+.panel h1{color:#b91c1c;margin:0 0 1rem;font-size:2.2rem}
+.panel a{color:#1d4ed8} .note{color:#555;font-size:.9rem;margin-top:1rem}
+.json-preview iframe{width:100%;height:70vh;border:1px solid #e5e7eb;border-radius:16px;background:#fff}
+@media (max-width:900px){.wrap{grid-template-columns:1fr}}
