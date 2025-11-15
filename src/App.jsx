@@ -1,0 +1,442 @@
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+
+const API_BASE = window.__GAME_DAY_API_BASE__ || (import.meta.env.DEV ? "" : window.location.origin);
+const PROJECT_LINKS =
+  window.__GAME_DAY_PROJECT_LINKS__ || [
+    { label: "Server - GitHub", href: "https://github.com/HadeemS/game-day-api" },
+    { label: "Server - Render", href: "https://game-day-api.onrender.com" },
+    { label: "Client - GitHub", href: "https://github.com/HadeemS/game-day" },
+    { label: "Client - Live Site", href: "https://hadeems.github.io/game-day" }
+  ];
+
+const initialFormState = {
+  title: "",
+  league: "",
+  date: "",
+  time: "",
+  venue: "",
+  city: "",
+  price: "",
+  img: "",
+  summary: ""
+};
+
+const DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const TIME_REGEX = /^([01]\d|2[0-3]):[0-5]\d$/;
+const IMG_REGEX = /^(https?:\/\/|\/)/i;
+
+const formatCurrency = value =>
+  `$${Number(value || 0).toLocaleString("en-US", {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  })}`;
+
+const formatDate = value => {
+  if (!value) return "";
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString(undefined, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  });
+};
+
+const validateGame = values => {
+  const errors = {};
+
+  const trimmedTitle = values.title.trim();
+  if (!trimmedTitle) {
+    errors.title = "Matchup title is required.";
+  } else if (trimmedTitle.length < 3) {
+    errors.title = "Title should be at least 3 characters.";
+  } else if (trimmedTitle.length > 100) {
+    errors.title = "Title must be 100 characters or less.";
+  }
+
+  const trimmedLeague = values.league.trim();
+  if (!trimmedLeague) {
+    errors.league = "League is required.";
+  } else if (trimmedLeague.length < 2) {
+    errors.league = "League must be at least 2 characters.";
+  } else if (trimmedLeague.length > 60) {
+    errors.league = "League must be 60 characters or less.";
+  }
+
+  if (!values.date) {
+    errors.date = "Date is required.";
+  } else if (!DATE_REGEX.test(values.date)) {
+    errors.date = "Use YYYY-MM-DD format.";
+  }
+
+  if (!values.time) {
+    errors.time = "Kick/tip time is required.";
+  } else if (!TIME_REGEX.test(values.time)) {
+    errors.time = "Use 24-hour HH:mm format.";
+  }
+
+  const trimmedVenue = values.venue.trim();
+  if (!trimmedVenue) {
+    errors.venue = "Venue is required.";
+  } else if (trimmedVenue.length < 3) {
+    errors.venue = "Venue must be at least 3 characters.";
+  } else if (trimmedVenue.length > 120) {
+    errors.venue = "Venue must be 120 characters or less.";
+  }
+
+  const trimmedCity = values.city.trim();
+  if (!trimmedCity) {
+    errors.city = "City is required.";
+  } else if (trimmedCity.length < 3) {
+    errors.city = "City must be at least 3 characters.";
+  } else if (trimmedCity.length > 120) {
+    errors.city = "City must be 120 characters or less.";
+  }
+
+  if (values.price === "") {
+    errors.price = "Price estimate is required.";
+  } else if (Number.isNaN(Number(values.price))) {
+    errors.price = "Price must be a number.";
+  } else {
+    const priceNum = Number(values.price);
+    if (!Number.isInteger(priceNum)) {
+      errors.price = "Price must be a whole number.";
+    } else if (priceNum < 0) {
+      errors.price = "Price cannot be negative.";
+    } else if (priceNum > 5000) {
+      errors.price = "Price must be $5000 or less.";
+    }
+  }
+
+  const trimmedImg = values.img.trim();
+  if (!trimmedImg) {
+    errors.img = "Image path or URL is required.";
+  } else if (!IMG_REGEX.test(trimmedImg)) {
+    errors.img = "Image should start with http(s):// or /";
+  }
+
+  const trimmedSummary = values.summary.trim();
+  if (!trimmedSummary) {
+    errors.summary = "Summary is required.";
+  } else if (trimmedSummary.length < 10) {
+    errors.summary = "Summary should be at least 10 characters.";
+  } else if (trimmedSummary.length > 280) {
+    errors.summary = "Keep the summary under 280 characters.";
+  }
+
+  return errors;
+};
+
+const ROUTES = [
+  { method: "GET", path: "/api/games", description: "List all posted games" },
+  { method: "GET", path: "/api/games/:id", description: "Grab a single contest" },
+  { method: "POST", path: "/api/games", description: "Add a brand new matchup" }
+];
+
+const formFields = [
+  { name: "title", label: "Matchup Title", placeholder: "Lakers vs Celtics", type: "text" },
+  { name: "league", label: "League", placeholder: "NBA, NFL, NCAA Football...", type: "text" },
+  { name: "date", label: "Date", type: "date" },
+  { name: "time", label: "Time", type: "time" },
+  { name: "venue", label: "Venue", placeholder: "Crypto.com Arena", type: "text" },
+  { name: "city", label: "City", placeholder: "Los Angeles, CA", type: "text" },
+  { name: "price", label: "Starting Price (USD)", placeholder: "120", type: "number" },
+  { name: "img", label: "Image URL or Path", placeholder: "/images/lakers-vs-celtics.png", type: "url", span: "full" },
+  { name: "summary", label: "Summary", placeholder: "What makes this matchup must-see TV?", type: "textarea", span: "full" }
+];
+
+const StatusMessage = ({ status }) => {
+  if (!status?.message) return null;
+  return (
+    <p
+      className={`status-pill ${status.type === "error" ? "status-pill--error" : "status-pill--success"}`}
+      role="status"
+    >
+      {status.message}
+    </p>
+  );
+};
+
+const ProjectLinks = ({ links }) => (
+  <div className="project-links">
+    <p className="section-label">Main 242 Home Base</p>
+    <div className="links-grid">
+      {links.map(link => (
+        <a
+          key={link.label}
+          href={link.href}
+          target="_blank"
+          rel="noreferrer"
+          className="link-tile"
+        >
+          <span>{link.label}</span>
+          <span aria-hidden="true">→</span>
+        </a>
+      ))}
+    </div>
+  </div>
+);
+
+const RoutesList = ({ games = [] }) => {
+  const baseUrl = API_BASE || (import.meta.env.DEV ? '' : window.location.origin);
+  
+  const getRouteUrl = (route) => {
+    if (route.path.includes(':id')) {
+      // Use first game's ID as example, or show pattern if no games
+      const exampleId = games.length > 0 ? games[0]._id : '1';
+      const path = route.path.replace(':id', exampleId);
+      return baseUrl ? `${baseUrl}${path}` : path;
+    }
+    return baseUrl ? `${baseUrl}${route.path}` : route.path;
+  };
+
+  return (
+    <ul className="routes-list">
+      {ROUTES.map(route => {
+        const url = getRouteUrl(route);
+        const displayPath = route.path.includes(':id') && games.length > 0
+          ? route.path.replace(':id', games[0]._id)
+          : route.path;
+        
+        return (
+          <li key={route.path}>
+            <span className="http-method">{route.method}</span>
+            <a href={url} target="_blank" rel="noreferrer">
+              {displayPath}
+            </a>
+            <p>{route.description}</p>
+          </li>
+        );
+      })}
+    </ul>
+  );
+};
+
+const GameCard = ({ game }) => (
+  <article className="game-card">
+    <div className="game-card__media">
+      <img src={game.img} alt={game.title} loading="lazy" />
+      <span className="game-card__badge">{game.league}</span>
+    </div>
+    <div className="game-card__body">
+      <h3>{game.title}</h3>
+      <p className="game-card__datetime">
+        {formatDate(game.date)} at {game.time}
+      </p>
+      <p className="game-card__location">
+        {game.venue}, {game.city}
+      </p>
+      <p className="game-card__summary">{game.summary}</p>
+      <p className="game-card__price">{formatCurrency(game.price)}</p>
+    </div>
+  </article>
+);
+
+const App = () => {
+  const [games, setGames] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState("");
+  const [formData, setFormData] = useState(initialFormState);
+  const [formErrors, setFormErrors] = useState({});
+  const [status, setStatus] = useState({ type: "idle", message: "" });
+  const [submitting, setSubmitting] = useState(false);
+
+  const fetchGames = useCallback(async () => {
+    setLoading(true);
+    setFetchError("");
+
+    try {
+      const url = API_BASE ? `${API_BASE}/api/games` : '/api/games';
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error("Unable to load games right now.");
+      }
+      const data = await response.json();
+      setGames(data);
+    } catch (error) {
+      setFetchError(error.message || "Unable to load games right now.");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchGames();
+  }, [fetchGames]);
+
+  const sortedGames = useMemo(() => {
+    return [...games].sort((a, b) => {
+      const first = new Date(`${a.date}T${a.time}`);
+      const second = new Date(`${b.date}T${b.time}`);
+      return first - second;
+    });
+  }, [games]);
+
+  const handleChange = event => {
+    const { name, value } = event.target;
+    setFormData(current => ({ ...current, [name]: value }));
+    setFormErrors(current => ({ ...current, [name]: undefined }));
+    setStatus({ type: "idle", message: "" });
+  };
+
+  const handleSubmit = async event => {
+    event.preventDefault();
+    const errors = validateGame(formData);
+
+    if (Object.keys(errors).length) {
+      setFormErrors(errors);
+      setStatus({ type: "error", message: "Please fix the highlighted fields." });
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      const payload = { ...formData, price: Number(formData.price) };
+      const url = API_BASE ? `${API_BASE}/api/games` : '/api/games';
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+
+      let responseData = null;
+      try {
+        responseData = await response.json();
+      } catch {
+        responseData = null;
+      }
+
+      if (!response.ok) {
+        const detail = responseData?.details?.join(" ") || "";
+        const message = responseData?.error || "Unable to save game.";
+        throw new Error(detail ? `${message} ${detail}` : message);
+      }
+
+      if (responseData?.game) {
+        setGames(current => [...current, responseData.game]);
+      } else {
+        fetchGames();
+      }
+
+      setFormData(initialFormState);
+      setFormErrors({});
+      setStatus({ type: "success", message: "Game posted successfully!" });
+    } catch (error) {
+      setStatus({
+        type: "error",
+        message: error.message || "Unable to save game."
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <main className="shell">
+      <header className="hero">
+        <div className="hero__copy">
+          <p className="eyebrow">Game Day API & React Client</p>
+          <h1>Plan must-watch matchups and keep the hype flowing.</h1>
+          <p className="lede">
+            Try the API, post a new rivalry, and see it populate instantly. React handles the live UI
+            while Joi keeps the data squeaky clean on the server.
+          </p>
+          <ProjectLinks links={PROJECT_LINKS} />
+          <RoutesList games={games} />
+        </div>
+        <div className="hero__preview">
+          <div className="preview-card">
+            <p className="section-label">Live JSON Preview</p>
+            <iframe 
+              title="Game Day API response" 
+              src={`${API_BASE || (import.meta.env.DEV ? '' : window.location.origin)}/api/games-preview`}
+              loading="lazy"
+            ></iframe>
+          </div>
+        </div>
+      </header>
+
+      <section className="content-grid">
+        <section className="panel form-panel">
+          <div className="panel__header">
+            <h2>Post a marquee matchup</h2>
+            <p>
+              Client-side validation mirrors the Joi rules on the server, so you know every entry will
+              land perfectly on the schedule.
+            </p>
+          </div>
+          <form className="form-grid" onSubmit={handleSubmit} noValidate>
+            {formFields.map(field => {
+              const isTextarea = field.type === "textarea";
+              const error = formErrors[field.name];
+              const inputProps = {
+                name: field.name,
+                id: field.name,
+                value: formData[field.name],
+                onChange: handleChange,
+                placeholder: field.placeholder,
+                "aria-invalid": Boolean(error),
+                "aria-describedby": error ? `${field.name}-error` : undefined
+              };
+
+              return (
+                <label
+                  key={field.name}
+                  className={`field ${field.span === "full" ? "field--full" : ""} ${error ? "field--error" : ""}`}
+                >
+                  <span>{field.label}</span>
+                  {isTextarea ? (
+                    <textarea rows="3" {...inputProps}></textarea>
+                  ) : (
+                    <input type={field.type} {...inputProps} />
+                  )}
+                  {error && (
+                    <span className="field-error" id={`${field.name}-error`}>
+                      {error}
+                    </span>
+                  )}
+                </label>
+              );
+            })}
+            <div className="form-footer">
+              <StatusMessage status={status} />
+              <button type="submit" disabled={submitting}>
+                {submitting ? "Posting..." : "Share this game"}
+              </button>
+            </div>
+          </form>
+        </section>
+
+        <section className="panel list-panel">
+          <div className="panel__header">
+            <h2>Upcoming spotlight games</h2>
+            <p>Every time you post, the schedule below updates instantly.</p>
+          </div>
+
+          {loading && <p className="muted">Loading your slate...</p>}
+          {fetchError && !loading && (
+            <p className="alert alert--error">{fetchError}</p>
+          )}
+          {!loading && !fetchError && (
+            <>
+              {sortedGames.length === 0 ? (
+                <p className="muted">No games yet. Be the first to add one!</p>
+              ) : (
+                <div className="games-grid">
+                  {sortedGames.map(game => (
+                    <GameCard game={game} key={game._id} />
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+        </section>
+      </section>
+    </main>
+  );
+};
+
+export default App;
+

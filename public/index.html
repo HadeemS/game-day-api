@@ -17,7 +17,11 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <script type="text/babel">
-    const API_BASE = window.__GAME_DAY_API_BASE__ || "";
+    // API_BASE: empty string means use same origin, or set to Render URL for GitHub Pages
+    const API_BASE = window.__GAME_DAY_API_BASE__ || 
+      (window.location.hostname.includes('github.io') || window.location.hostname.includes('github.com') 
+        ? 'https://game-day-api.onrender.com' 
+        : '');
     const PROJECT_LINKS =
       window.__GAME_DAY_PROJECT_LINKS__ || [
         { label: "Server - GitHub", href: "https://github.com/HadeemS/game-day-api" },
@@ -202,9 +206,10 @@
         if (route.path.includes(':id')) {
           // Use first game's ID as example, or show pattern if no games
           const exampleId = games.length > 0 ? games[0]._id : '1';
-          return `${baseUrl}${route.path.replace(':id', exampleId)}`;
+          const path = route.path.replace(':id', exampleId);
+          return baseUrl ? `${baseUrl}${path}` : path;
         }
-        return `${baseUrl}${route.path}`;
+        return baseUrl ? `${baseUrl}${route.path}` : route.path;
       };
 
       return (
@@ -263,7 +268,8 @@
         setFetchError("");
 
         try {
-          const response = await fetch(`${API_BASE}/api/games`);
+          const url = API_BASE ? `${API_BASE}/api/games` : '/api/games';
+          const response = await fetch(url);
           if (!response.ok) {
             throw new Error("Unable to load games right now.");
           }
@@ -309,7 +315,8 @@
 
         try {
           const payload = { ...formData, price: Number(formData.price) };
-          const response = await fetch(`${API_BASE}/api/games`, {
+          const url = API_BASE ? `${API_BASE}/api/games` : '/api/games';
+          const response = await fetch(url, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload)
@@ -457,3 +464,4 @@
   </script>
 </body>
 </html>
+
