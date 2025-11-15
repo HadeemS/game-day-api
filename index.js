@@ -55,6 +55,45 @@ app.get("/api/games/:id", (req, res) => {
   res.json(item);
 });
 
+// JSON preview page for iframe
+app.get("/api/games-preview", (_req, res) => {
+  const jsonString = JSON.stringify(games, null, 2);
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <title>Games JSON</title>
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+          font-family: 'Monaco', 'Menlo', 'Courier New', monospace;
+          font-size: 13px;
+          line-height: 1.6;
+          background: #1e1e1e;
+          color: #d4d4d4;
+          padding: 1rem;
+          overflow: auto;
+        }
+        pre {
+          white-space: pre-wrap;
+          word-wrap: break-word;
+        }
+        .json-key { color: #9cdcfe; }
+        .json-string { color: #ce9178; }
+        .json-number { color: #b5cea8; }
+        .json-boolean { color: #569cd6; }
+        .json-null { color: #569cd6; }
+      </style>
+    </head>
+    <body>
+      <pre>${jsonString.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</pre>
+    </body>
+    </html>
+  `);
+});
+
 app.post("/api/games", (req, res) => {
   const { value, error } = gameSchema.validate(req.body, {
     abortEarly: false,

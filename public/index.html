@@ -68,6 +68,8 @@
         errors.title = "Matchup title is required.";
       } else if (trimmedTitle.length < 3) {
         errors.title = "Title should be at least 3 characters.";
+      } else if (trimmedTitle.length > 100) {
+        errors.title = "Title must be 100 characters or less.";
       }
 
       const trimmedLeague = values.league.trim();
@@ -75,6 +77,8 @@
         errors.league = "League is required.";
       } else if (trimmedLeague.length < 2) {
         errors.league = "League must be at least 2 characters.";
+      } else if (trimmedLeague.length > 60) {
+        errors.league = "League must be 60 characters or less.";
       }
 
       if (!values.date) {
@@ -94,6 +98,8 @@
         errors.venue = "Venue is required.";
       } else if (trimmedVenue.length < 3) {
         errors.venue = "Venue must be at least 3 characters.";
+      } else if (trimmedVenue.length > 120) {
+        errors.venue = "Venue must be 120 characters or less.";
       }
 
       const trimmedCity = values.city.trim();
@@ -101,16 +107,23 @@
         errors.city = "City is required.";
       } else if (trimmedCity.length < 3) {
         errors.city = "City must be at least 3 characters.";
+      } else if (trimmedCity.length > 120) {
+        errors.city = "City must be 120 characters or less.";
       }
 
       if (values.price === "") {
         errors.price = "Price estimate is required.";
       } else if (Number.isNaN(Number(values.price))) {
         errors.price = "Price must be a number.";
-      } else if (Number(values.price) < 0) {
-        errors.price = "Price cannot be negative.";
-      } else if (Number(values.price) > 5000) {
-        errors.price = "Price must be $5000 or less.";
+      } else {
+        const priceNum = Number(values.price);
+        if (!Number.isInteger(priceNum)) {
+          errors.price = "Price must be a whole number.";
+        } else if (priceNum < 0) {
+          errors.price = "Price cannot be negative.";
+        } else if (priceNum > 5000) {
+          errors.price = "Price must be $5000 or less.";
+        }
       }
 
       const trimmedImg = values.img.trim();
@@ -175,26 +188,46 @@
               className="link-tile"
             >
               <span>{link.label}</span>
-              <span aria-hidden="true">-></span>
+              <span aria-hidden="true">→</span>
             </a>
           ))}
         </div>
       </div>
     );
 
-    const RoutesList = () => (
-      <ul className="routes-list">
-        {ROUTES.map(route => (
-          <li key={route.path}>
-            <span className="http-method">{route.method}</span>
-            <a href={route.path} target="_blank" rel="noreferrer">
-              {route.path}
-            </a>
-            <p>{route.description}</p>
-          </li>
-        ))}
-      </ul>
-    );
+    const RoutesList = ({ games = [] }) => {
+      const baseUrl = API_BASE || window.location.origin;
+      
+      const getRouteUrl = (route) => {
+        if (route.path.includes(':id')) {
+          // Use first game's ID as example, or show pattern if no games
+          const exampleId = games.length > 0 ? games[0]._id : '1';
+          return `${baseUrl}${route.path.replace(':id', exampleId)}`;
+        }
+        return `${baseUrl}${route.path}`;
+      };
+
+      return (
+        <ul className="routes-list">
+          {ROUTES.map(route => {
+            const url = getRouteUrl(route);
+            const displayPath = route.path.includes(':id') && games.length > 0
+              ? route.path.replace(':id', games[0]._id)
+              : route.path;
+            
+            return (
+              <li key={route.path}>
+                <span className="http-method">{route.method}</span>
+                <a href={url} target="_blank" rel="noreferrer">
+                  {displayPath}
+                </a>
+                <p>{route.description}</p>
+              </li>
+            );
+          })}
+        </ul>
+      );
+    };
 
     const GameCard = ({ game }) => (
       <article className="game-card">
@@ -325,12 +358,16 @@
                 while Joi keeps the data squeaky clean on the server.
               </p>
               <ProjectLinks links={PROJECT_LINKS} />
-              <RoutesList />
+              <RoutesList games={games} />
             </div>
             <div className="hero__preview">
               <div className="preview-card">
                 <p className="section-label">Live JSON Preview</p>
-                <iframe title="Game Day API response" src="/api/games" loading="lazy"></iframe>
+                <iframe 
+                  title="Game Day API response" 
+                  src={`${API_BASE || window.location.origin}/api/games-preview`}
+                  loading="lazy"
+                ></iframe>
               </div>
             </div>
           </header>
