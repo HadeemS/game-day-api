@@ -2,11 +2,36 @@
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
+const Joi = require("joi");
 const games = require("./data/games");
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+const gameSchema = Joi.object({
+  title: Joi.string().trim().min(3).max(100).required(),
+  league: Joi.string().trim().min(2).max(60).required(),
+  date: Joi.string()
+    .pattern(/^\d{4}-\d{2}-\d{2}$/, "ISO date (YYYY-MM-DD)")
+    .required(),
+  time: Joi.string()
+    .pattern(/^([01]\d|2[0-3]):[0-5]\d$/, "24-hour time (HH:mm)")
+    .required(),
+  venue: Joi.string().trim().min(3).max(120).required(),
+  city: Joi.string().trim().min(3).max(120).required(),
+  price: Joi.number().integer().min(0).max(5000).required(),
+  img: Joi.string()
+    .trim()
+    .pattern(/^(https?:\/\/|\/)/, "absolute URL or asset path")
+    .required(),
+  summary: Joi.string().trim().min(10).max(280).required()
+});
+
+const getNextId = () => {
+  if (!games.length) return 1;
+  return Math.max(...games.map(game => Number(game._id))) + 1;
+};
 
 // serve /public (index.html, styles.css, /images/*)
 app.use(express.static(path.join(__dirname, "public")));
@@ -16,7 +41,8 @@ app.get("/api", (req, res) => {
   res.json({
     routes: [
       { method: "GET", path: "/api/games" },
-      { method: "GET", path: "/api/games/:id" }
+      { method: "GET", path: "/api/games/:id" },
+      { method: "POST", path: "/api/games" }
     ]
   });
 });
@@ -27,6 +53,45 @@ app.get("/api/games/:id", (req, res) => {
   const item = games.find(g => String(g._id) === req.params.id);
   if (!item) return res.status(404).json({ error: "Not found" });
   res.json(item);
+});
+
+app.post("/api/games", (req, res) => {
+  const { value, error } = gameSchema.validate(req.body, {
+    abortEarly: false,
+    convert: true
+  });
+
+  if (error) {
+    return res.status(400).json({
+      error: "Validation failed",
+      details: error.details.map(detail => detail.message.replace(/["]/g, ""))
+    });
+  }
+
+  const duplicate = games.find(
+    game =>
+      game.title.toLowerCase() === value.title.toLowerCase() &&
+      game.date === value.date
+  );
+  if (duplicate) {
+    return res
+      .status(409)
+      .json({ error: "That game is already on the schedule." });
+  }
+
+  const newGame = {
+    _id: getNextId(),
+    ...value,
+    price: Number(value.price)
+  };
+
+  games.push(newGame);
+
+  res.status(201).json({
+    success: true,
+    message: "Game created",
+    game: newGame
+  });
 });
 
 // human landing page
