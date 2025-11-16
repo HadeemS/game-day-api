@@ -2,22 +2,13 @@
   "name": "game-day-api",
   "version": "1.0.0",
   "main": "index.js",
-  "private": false,
   "scripts": {
-    "start": "node index.js",
-    "dev": "node index.js",
-    "seed": "node scripts/seed.js",
-    "predeploy": "echo '✓ Checking deployment readiness...' && node -c index.js && echo '✓ Server code validated'",
-    "deploy": "echo 'To deploy to Render: Push to GitHub. Make sure MONGODB_URI is set in Render environment variables.' && echo 'Repository will auto-deploy on Render when pushed to main branch.'"
+    "start": "node index.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
     "express": "^4.19.2",
-    "joi": "^17.13.3",
-    "mongoose": "^8.0.0"
+    "joi": "^17.13.3"
   },
-  "engines": {
-    "node": ">=18"
-  }
+  "engines": { "node": ">=18" }
 }
-  
