@@ -370,11 +370,11 @@
             <div className="hero__preview">
               <div className="preview-card">
                 <p className="section-label">Live JSON Preview</p>
-                <iframe 
-                  title="Game Day API response" 
-                  src={`${API_BASE || window.location.origin}/api/games-preview`}
-                  loading="lazy"
-                ></iframe>
+            <iframe 
+              title="Game Day API response" 
+              src={`${API_BASE ? API_BASE : window.location.origin}/api/games-preview`}
+              loading="lazy"
+            ></iframe>
               </div>
             </div>
           </header>
