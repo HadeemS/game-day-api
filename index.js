@@ -29,7 +29,9 @@ app.get("/api", (_req, res) => {
     routes: [
       { method: "GET", path: "/api/games" },
       { method: "GET", path: "/api/games/:id" },
-      { method: "POST", path: "/api/games" }
+      { method: "POST", path: "/api/games" },
+      { method: "PUT", path: "/api/games/:id" },
+      { method: "DELETE", path: "/api/games/:id" }
     ]
   });
 });
@@ -55,6 +57,34 @@ app.post("/api/games", (req, res) => {
   const game = { _id: nextId, ...value };
   games.push(game);
   res.status(201).json({ ok: true, game });
+});
+
+app.put("/api/games/:id", (req, res) => {
+  const { error, value } = gameSchema.validate(req.body, { abortEarly: false });
+  if (error) {
+    return res.status(400).json({
+      ok: false,
+      message: "Validation failed",
+      details: error.details.map(d => d.message)
+    });
+  }
+  const id = parseInt(req.params.id, 10);
+  const index = games.findIndex(g => g._id === id);
+  if (index === -1) {
+    return res.status(404).json({ ok: false, error: "Game not found" });
+  }
+  games[index] = { _id: id, ...value };
+  res.status(200).json({ ok: true, game: games[index] });
+});
+
+app.delete("/api/games/:id", (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const index = games.findIndex(g => g._id === id);
+  if (index === -1) {
+    return res.status(404).json({ ok: false, error: "Game not found" });
+  }
+  const deleted = games.splice(index, 1)[0];
+  res.status(200).json({ ok: true, game: deleted });
 });
 
 // Landing

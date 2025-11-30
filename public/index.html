@@ -8,7 +8,12 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
-  <script>window.__GAME_DAY_API_BASE__="https://game-day-api-1.onrender.com";</script>
+  <script>
+    // Auto-detect if on GitHub Pages and use Render API, otherwise use relative paths for local dev
+    if(window.location.hostname.includes('github.io') || window.location.hostname.includes('github.com')){
+      window.__GAME_DAY_API_BASE__ = "https://game-day-api-1.onrender.com";
+    }
+  </script>
 
   <!-- If you ALSO host this page on GitHub Pages, uncomment the line below so it fetches the Render API -->
   <style>
@@ -67,8 +72,8 @@
           <p class="muted">Routes</p>
           <ul class="routes-list">
             <li><span class="http-method">GET</span> <a id="link-all" href="/api/games" target="_blank">/api/games</a> <p>List all games</p></li>
-            <li><span class="http-method">GET</span> <a href="/api/games/1" target="_blank">/api/games/:id</a> <p>Single game</p></li>
-            <li><span class="http-method">POST</span> <code>/api/games</code> <p>Add a new matchup</p></li>
+            <li><span class="http-method">GET</span> <a id="link-one" href="/api/games/1" target="_blank">/api/games/:id</a> <p>Single game</p></li>
+            <li><span class="http-method">POST</span> <a id="link-post" href="/api/games" target="_blank">/api/games</a> <p>Add a new matchup (use form below)</p></li>
           </ul>
         </div>
       </div>
@@ -155,6 +160,8 @@
         // fix the iframe + links to use correct base
         $("#json-frame").src = API_BASE + "/api/games";
         $("#link-all").href = API_BASE + "/api/games";
+        $("#link-post").href = API_BASE + "/api/games";
+        $("#link-one").href = API_BASE + "/api/games/1";
       }catch(e){
         $("#json-pretty").textContent = "Failed to load JSON.";
         $("#list-error").style.display = "";
@@ -193,18 +200,26 @@
     }
 
     async function createGame(payload){
-      const r = await fetch(API_BASE + "/api/games", {
-        method: "POST",
-        headers: {"Content-Type":"application/json"},
-        body: JSON.stringify(payload)
-      });
-      const data = await r.json().catch(()=>null);
-      if(!r.ok){
-        const msg = (data && (data.message || data.error)) || "Server error";
-        const extra = (data && data.details && data.details.join(" ")) || "";
-        throw new Error(extra ? (msg + " " + extra) : msg);
+      try {
+        const r = await fetch(API_BASE + "/api/games", {
+          method: "POST",
+          headers: {"Content-Type":"application/json"},
+          body: JSON.stringify(payload)
+        });
+        const data = await r.json().catch(()=>({error: "Failed to parse response"}));
+        if(!r.ok){
+          const msg = (data && (data.message || data.error)) || `Server error (${r.status})`;
+          const extra = (data && data.details && data.details.join(" ")) || "";
+          throw new Error(extra ? (msg + " " + extra) : msg);
+        }
+        return (data && (data.game || data.item)) || null;
+      } catch(err) {
+        // If it's a network error, provide more helpful message
+        if(err.name === "TypeError" && err.message.includes("fetch")) {
+          throw new Error(`Network error: Could not reach ${API_BASE}. Check if server is running.`);
+        }
+        throw err;
       }
-      return (data && (data.game || data.item)) || null;
     }
 
     function formStatus(type, msg){
@@ -213,6 +228,60 @@
       box.textContent = msg;
       box.style.display = "";
       setTimeout(() => { box.style.display = "none"; }, 3000);
+    }
+
+    // Client-side validation matching server-side Joi schema
+    function validateGame(data){
+      const errors = [];
+      
+      // title: string().min(3).max(80).required()
+      if(!data.title || data.title.trim().length < 3 || data.title.trim().length > 80){
+        errors.push("Title must be 3-80 characters");
+      }
+      
+      // league: string().valid("NFL","NBA","NCAA Football","MLB","MLS").required()
+      const validLeagues = ["NFL", "NBA", "NCAA Football", "MLB", "MLS"];
+      if(!data.league || !validLeagues.includes(data.league)){
+        errors.push("League must be one of: NFL, NBA, NCAA Football, MLB, MLS");
+      }
+      
+      // date: string().pattern(/^\d{4}-\d{2}-\d{2}$/).required()
+      if(!data.date || !/^\d{4}-\d{2}-\d{2}$/.test(data.date)){
+        errors.push("Date must be in YYYY-MM-DD format");
+      }
+      
+      // time: string().pattern(/^\d{2}:\d{2}$/).required()
+      if(!data.time || !/^\d{2}:\d{2}$/.test(data.time)){
+        errors.push("Time must be in HH:MM format");
+      }
+      
+      // venue: string().min(2).max(80).required()
+      if(!data.venue || data.venue.trim().length < 2 || data.venue.trim().length > 80){
+        errors.push("Venue must be 2-80 characters");
+      }
+      
+      // city: string().min(2).max(80).required()
+      if(!data.city || data.city.trim().length < 2 || data.city.trim().length > 80){
+        errors.push("City must be 2-80 characters");
+      }
+      
+      // price: number().integer().min(0).max(10000).required()
+      const priceNum = Number(data.price);
+      if(isNaN(priceNum) || !Number.isInteger(priceNum) || priceNum < 0 || priceNum > 10000){
+        errors.push("Price must be an integer between 0 and 10000");
+      }
+      
+      // img: string().pattern(/^\/images\/[a-z0-9._\-]+\.(png|jpg|jpeg|webp)$/i).required()
+      if(!data.img || !/^\/images\/[a-z0-9._\-]+\.(png|jpg|jpeg|webp)$/i.test(data.img.trim())){
+        errors.push("Image must be a path like /images/filename.png (png, jpg, jpeg, or webp)");
+      }
+      
+      // summary: string().min(5).max(240).required()
+      if(!data.summary || data.summary.trim().length < 5 || data.summary.trim().length > 240){
+        errors.push("Summary must be 5-240 characters");
+      }
+      
+      return errors.length > 0 ? errors : null;
     }
 
     $("#refresh").addEventListener("click", loadJSON);
@@ -224,13 +293,21 @@
         title: fd.get("title")?.trim() || "",
         league: fd.get("league") || "NBA",
         date: fd.get("date") || "",
-        time: fd.get("time") || "",
+        time: fd.get("time") || "", // HTML5 time input returns HH:MM format
         venue: fd.get("venue")?.trim() || "",
         city: fd.get("city")?.trim() || "",
-        price: Number(fd.get("price") || 0),
+        price: Math.floor(Number(fd.get("price") || 0)), // Ensure integer
         img: (fd.get("img") || "").trim(),
         summary: fd.get("summary")?.trim() || ""
       };
+      
+      // Client-side validation
+      const validationErrors = validateGame(payload);
+      if(validationErrors){
+        formStatus("error", validationErrors.join(". "));
+          return;
+        }
+
       try{
         const created = await createGame(payload);
         formStatus("ok","Game posted successfully!");

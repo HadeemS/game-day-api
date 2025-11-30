@@ -46,3 +46,17 @@ export async function createGame(game) {
     body: JSON.stringify(game)
   });
 }
+
+export async function updateGame(id, game) {
+  return request(`/api/games/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(game)
+  });
+}
+
+export async function deleteGame(id) {
+  return request(`/api/games/${id}`, {
+    method: "DELETE"
+  });
+}
