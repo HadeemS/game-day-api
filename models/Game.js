@@ -44,7 +44,7 @@ const gameSchema = new mongoose.Schema({
     type: Number,
     required: true,
     min: 0,
-    max: 5000,
+    max: 10000,
     integer: true
   },
   img: {
@@ -53,12 +53,19 @@ const gameSchema = new mongoose.Schema({
     trim: true,
     match: /^(https?:\/\/|\/)/
   },
+  imageUrl: {
+    type: String,
+    required: true,
+    trim: true,
+    // Allow full URLs (http/https) or relative paths starting with /
+    match: /^(https?:\/\/[^\s]+|\/[^\s]+\.(png|jpg|jpeg|webp|gif)$)/i
+  },
   summary: {
     type: String,
     required: true,
     trim: true,
-    minlength: 10,
-    maxlength: 280
+    minlength: 5,
+    maxlength: 240
   }
 }, {
   timestamps: false

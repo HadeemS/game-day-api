@@ -1,4 +1,5 @@
 // scripts/seed.js
+require("dotenv").config();
 const mongoose = require("mongoose");
 const Game = require("../models/Game");
 
@@ -14,6 +15,7 @@ const initialGames = [
     city: "Columbia, SC",
     price: 85,
     img: "/images/usc-vs-clemson.jpg",
+    imageUrl: "/images/usc-vs-clemson.jpg",
     summary: "Palmetto Bowl rivalry showdown."
   },
   {
@@ -25,6 +27,7 @@ const initialGames = [
     city: "Los Angeles, CA",
     price: 210,
     img: "/images/lakers-vs-celtics.png",
+    imageUrl: "/images/lakers-vs-celtics.png",
     summary: "Classic NBA rivalry."
   },
   {
@@ -36,16 +39,14 @@ const initialGames = [
     city: "Atlanta, GA",
     price: 120,
     img: "/images/saints-vs-falcons.jpg",
+    imageUrl: "/images/saints-vs-falcons.jpg",
     summary: "NFC South battle."
   }
 ];
 
 async function seed() {
   try {
-    await mongoose.connect(MONGODB_URI, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true
-    });
+    await mongoose.connect(MONGODB_URI);
     console.log("Connected to MongoDB");
 
     // Clear existing games (optional - remove if you want to keep existing data)

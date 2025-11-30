@@ -3,14 +3,18 @@ const express = require("express");
 const cors = require("cors");
 const path = require("path");
 const Joi = require("joi");
-let games = require("./data/games");
+const connectDB = require("./db");
+const Game = require("./models/Game");
+
+// Connect to MongoDB
+connectDB();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public"))); // serve landing + /images
 
-// --- Validation schema (matches client) ---
+// --- Validation schema (matches Mongoose schema and client) ---
 const gameSchema = Joi.object({
   title: Joi.string().min(3).max(80).required(),
   league: Joi.string().valid("NFL","NBA","NCAA Football","MLB","MLS").required(),
@@ -20,6 +24,7 @@ const gameSchema = Joi.object({
   city: Joi.string().min(2).max(80).required(),
   price: Joi.number().integer().min(0).max(10000).required(),
   img: Joi.string().pattern(/^\/images\/[a-z0-9._\-]+\.(png|jpg|jpeg|webp)$/i).required(),
+  imageUrl: Joi.string().pattern(/^(https?:\/\/[^\s]+|\/[^\s]+\.(png|jpg|jpeg|webp|gif)$)/i).required(),
   summary: Joi.string().min(5).max(240).required()
 });
 
@@ -36,15 +41,32 @@ app.get("/api", (_req, res) => {
   });
 });
 
-app.get("/api/games", (_req, res) => res.json(games));
-
-app.get("/api/games/:id", (req, res) => {
-  const item = games.find(g => String(g._id) === req.params.id);
-  if (!item) return res.status(404).json({ error: "Not found" });
-  res.json(item);
+// GET all games
+app.get("/api/games", async (_req, res) => {
+  try {
+    const games = await Game.find({});
+    res.json(games);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch games", message: error.message });
+  }
 });
 
-app.post("/api/games", (req, res) => {
+// GET single game by ID
+app.get("/api/games/:id", async (req, res) => {
+  try {
+    const game = await Game.findById(req.params.id);
+    if (!game) {
+      return res.status(404).json({ error: "Game not found" });
+    }
+    res.json(game);
+  } catch (error) {
+    res.status(500).json({ error: "Failed to fetch game", message: error.message });
+  }
+});
+
+// POST - Create new game
+app.post("/api/games", async (req, res) => {
+  // Validate with Joi first
   const { error, value } = gameSchema.validate(req.body, { abortEarly: false });
   if (error) {
     return res.status(400).json({
@@ -53,13 +75,24 @@ app.post("/api/games", (req, res) => {
       details: error.details.map(d => d.message)
     });
   }
-  const nextId = games.length ? Math.max(...games.map(g => g._id)) + 1 : 1;
-  const game = { _id: nextId, ...value };
-  games.push(game);
-  res.status(201).json({ ok: true, game });
+
+  try {
+    // Create new game in MongoDB
+    const game = new Game(value);
+    const savedGame = await game.save();
+    res.status(201).json({ ok: true, game: savedGame });
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      error: "Failed to create game",
+      message: error.message
+    });
+  }
 });
 
-app.put("/api/games/:id", (req, res) => {
+// PUT - Update existing game
+app.put("/api/games/:id", async (req, res) => {
+  // Validate with Joi first
   const { error, value } = gameSchema.validate(req.body, { abortEarly: false });
   if (error) {
     return res.status(400).json({
@@ -68,23 +101,46 @@ app.put("/api/games/:id", (req, res) => {
       details: error.details.map(d => d.message)
     });
   }
-  const id = parseInt(req.params.id, 10);
-  const index = games.findIndex(g => g._id === id);
-  if (index === -1) {
-    return res.status(404).json({ ok: false, error: "Game not found" });
+
+  try {
+    // Find and update game in MongoDB
+    const game = await Game.findByIdAndUpdate(
+      req.params.id,
+      value,
+      { new: true, runValidators: true }
+    );
+    
+    if (!game) {
+      return res.status(404).json({ ok: false, error: "Game not found" });
+    }
+    
+    res.status(200).json({ ok: true, game });
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      error: "Failed to update game",
+      message: error.message
+    });
   }
-  games[index] = { _id: id, ...value };
-  res.status(200).json({ ok: true, game: games[index] });
 });
 
-app.delete("/api/games/:id", (req, res) => {
-  const id = parseInt(req.params.id, 10);
-  const index = games.findIndex(g => g._id === id);
-  if (index === -1) {
-    return res.status(404).json({ ok: false, error: "Game not found" });
+// DELETE - Remove game
+app.delete("/api/games/:id", async (req, res) => {
+  try {
+    const game = await Game.findByIdAndDelete(req.params.id);
+    
+    if (!game) {
+      return res.status(404).json({ ok: false, error: "Game not found" });
+    }
+    
+    res.status(200).json({ ok: true, game });
+  } catch (error) {
+    res.status(500).json({
+      ok: false,
+      error: "Failed to delete game",
+      message: error.message
+    });
   }
-  const deleted = games.splice(index, 1)[0];
-  res.status(200).json({ ok: true, game: deleted });
 });
 
 // Landing
