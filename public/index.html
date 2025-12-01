@@ -110,6 +110,7 @@
           <label>City<input name="city" placeholder="Los Angeles, CA" required /></label>
           <label>Starting Price (USD)<input type="number" name="price" min="0" step="1" value="0" required /></label>
           <label class="full">Image path<input name="img" placeholder="/images/usc-vs-clemson.jpg" required /></label>
+          <label class="full">Image URL<input name="imageUrl" placeholder="/images/usc-vs-clemson.jpg or https://example.com/image.jpg" required /></label>
           <label class="full">Summary<textarea rows="3" name="summary" placeholder="What makes this matchup must-see TV?" required></textarea></label>
           <div class="form-footer">
             <span id="status" class="status" style="display:none"></span>
@@ -178,7 +179,7 @@
           (() => {
             const wrap = el("div",{style:"position:relative"});
             wrap.append(
-              el("img",{src: g.img, alt: g.title, loading:"lazy"}),
+              el("img",{src: g.imageUrl || g.img, alt: g.title, loading:"lazy"}),
               el("span",{class:"badge", text: g.league})
             );
             return wrap;
@@ -276,6 +277,11 @@
         errors.push("Image must be a path like /images/filename.png (png, jpg, jpeg, or webp)");
       }
       
+      // imageUrl: string().pattern(/^(https?:\/\/[^\s]+|\/[^\s]+\.(png|jpg|jpeg|webp|gif)$)/i).required()
+      if(!data.imageUrl || !/^(https?:\/\/[^\s]+|\/[^\s]+\.(png|jpg|jpeg|webp|gif)$)/i.test(data.imageUrl.trim())){
+        errors.push("Image URL must be a full URL (http:// or https://) or a relative path ending with .png, .jpg, .jpeg, .webp, or .gif");
+      }
+      
       // summary: string().min(5).max(240).required()
       if(!data.summary || data.summary.trim().length < 5 || data.summary.trim().length > 240){
         errors.push("Summary must be 5-240 characters");
@@ -298,6 +304,7 @@
         city: fd.get("city")?.trim() || "",
         price: Math.floor(Number(fd.get("price") || 0)), // Ensure integer
         img: (fd.get("img") || "").trim(),
+        imageUrl: (fd.get("imageUrl") || "").trim(),
         summary: fd.get("summary")?.trim() || ""
       };
       
