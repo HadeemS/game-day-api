@@ -15,7 +15,7 @@ const gameSchema = Joi.object({
   city: Joi.string().min(2).max(80).required(),
   price: Joi.number().integer().min(0).max(10000).required(),
   img: Joi.string()
-    .pattern(/^\/images\/[a-z0-9._\-]+\.(png|jpg|jpeg|webp)$/i)
+    .pattern(/^(https?:\/\/|\/)/i) // More flexible: just needs to start with http://, https://, or /
     .required(),
   imageUrl: Joi.string()
     .pattern(/^(https?:\/\/[^\s]+|\/[^\s]+\.(png|jpg|jpeg|webp|gif)$)/i)
@@ -78,14 +78,29 @@ router.post("/", async (req, res) => {
 });
 
 router.put("/:id", async (req, res) => {
-  const { error, value } = gameSchema.validate(req.body, {
+  // Remove any extra fields that aren't in the schema (like _id, __v, etc.)
+  const cleanBody = {
+    title: req.body.title,
+    league: req.body.league,
+    date: req.body.date,
+    time: req.body.time,
+    venue: req.body.venue,
+    city: req.body.city,
+    price: req.body.price,
+    img: req.body.img,
+    imageUrl: req.body.imageUrl,
+    summary: req.body.summary
+  };
+
+  const { error, value } = gameSchema.validate(cleanBody, {
     abortEarly: false
   });
   if (error) {
     return res.status(400).json({
       ok: false,
       message: "Validation failed",
-      details: formatJoiErrors(error)
+      details: formatJoiErrors(error),
+      received: cleanBody // Include what was received for debugging
     });
   }
 
