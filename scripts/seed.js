@@ -1,4 +1,3 @@
-// scripts/seed.js
 require("dotenv").config();
 const mongoose = require("mongoose");
 const Game = require("../models/Game");
@@ -46,23 +45,25 @@ const initialGames = [
 
 async function seed() {
   try {
-    await mongoose.connect(MONGODB_URI);
-    console.log("Connected to MongoDB");
+    await mongoose.connect(MONGODB_URI, {
+      serverSelectionTimeoutMS: 5000
+    });
+    console.log("✅ Connected to MongoDB");
 
-    // Clear existing games (optional - remove if you want to keep existing data)
     await Game.deleteMany({});
-    console.log("Cleared existing games");
+    console.log("✅ Cleared existing games");
 
-    // Insert initial games
     const games = await Game.insertMany(initialGames);
-    console.log(`Seeded ${games.length} games successfully`);
+    console.log(`✅ Seeded ${games.length} games successfully`);
 
     await mongoose.connection.close();
-    console.log("Database connection closed");
+    console.log("✅ Database connection closed");
     process.exit(0);
   } catch (error) {
-    console.error("Seed error:", error);
-    await mongoose.connection.close();
+    console.error("❌ Seed error:", error.message);
+    if (mongoose.connection.readyState === 1) {
+      await mongoose.connection.close();
+    }
     process.exit(1);
   }
 }

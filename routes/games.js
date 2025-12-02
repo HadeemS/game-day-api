@@ -47,6 +47,9 @@ router.get("/:id", async (req, res) => {
     }
     res.json(game);
   } catch (error) {
+    if (error.name === "CastError") {
+      return res.status(404).json({ error: "Game not found" });
+    }
     res
       .status(500)
       .json({ error: "Failed to fetch game", message: error.message });
@@ -99,8 +102,7 @@ router.put("/:id", async (req, res) => {
     return res.status(400).json({
       ok: false,
       message: "Validation failed",
-      details: formatJoiErrors(error),
-      received: cleanBody // Include what was received for debugging
+      details: formatJoiErrors(error)
     });
   }
 
@@ -114,6 +116,9 @@ router.put("/:id", async (req, res) => {
     }
     res.json({ ok: true, game });
   } catch (err) {
+    if (err.name === "CastError") {
+      return res.status(404).json({ ok: false, error: "Game not found" });
+    }
     res.status(500).json({
       ok: false,
       error: "Failed to update game",
@@ -130,6 +135,9 @@ router.delete("/:id", async (req, res) => {
     }
     res.json({ ok: true, game });
   } catch (err) {
+    if (err.name === "CastError") {
+      return res.status(404).json({ ok: false, error: "Game not found" });
+    }
     res.status(500).json({
       ok: false,
       error: "Failed to delete game",
