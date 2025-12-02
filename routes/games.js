@@ -15,7 +15,7 @@ const gameSchema = Joi.object({
   city: Joi.string().min(2).max(80).required(),
   price: Joi.number().integer().min(0).max(10000).required(),
   img: Joi.string()
-    .pattern(/^(https?:\/\/|\/)/i) // More flexible: just needs to start with http://, https://, or /
+    .pattern(/^\/images\/[a-z0-9._\-]+\.(png|jpg|jpeg|webp)$/i)
     .required(),
   imageUrl: Joi.string()
     .pattern(/^(https?:\/\/[^\s]+|\/[^\s]+\.(png|jpg|jpeg|webp|gif)$)/i)
@@ -47,9 +47,6 @@ router.get("/:id", async (req, res) => {
     }
     res.json(game);
   } catch (error) {
-    if (error.name === "CastError") {
-      return res.status(404).json({ error: "Game not found" });
-    }
     res
       .status(500)
       .json({ error: "Failed to fetch game", message: error.message });
@@ -102,7 +99,8 @@ router.put("/:id", async (req, res) => {
     return res.status(400).json({
       ok: false,
       message: "Validation failed",
-      details: formatJoiErrors(error)
+      details: formatJoiErrors(error),
+      received: cleanBody // Include what was received for debugging
     });
   }
 
@@ -116,9 +114,6 @@ router.put("/:id", async (req, res) => {
     }
     res.json({ ok: true, game });
   } catch (err) {
-    if (err.name === "CastError") {
-      return res.status(404).json({ ok: false, error: "Game not found" });
-    }
     res.status(500).json({
       ok: false,
       error: "Failed to update game",
@@ -135,9 +130,6 @@ router.delete("/:id", async (req, res) => {
     }
     res.json({ ok: true, game });
   } catch (err) {
-    if (err.name === "CastError") {
-      return res.status(404).json({ ok: false, error: "Game not found" });
-    }
     res.status(500).json({
       ok: false,
       error: "Failed to delete game",

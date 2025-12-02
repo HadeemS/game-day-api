@@ -7,7 +7,7 @@ const gameSchema = new mongoose.Schema({
     required: true,
     trim: true,
     minlength: 3,
-    maxlength: 80
+    maxlength: 100
   },
   league: {
     type: String,
@@ -30,15 +30,15 @@ const gameSchema = new mongoose.Schema({
     type: String,
     required: true,
     trim: true,
-    minlength: 2,
-    maxlength: 80
+    minlength: 3,
+    maxlength: 120
   },
   city: {
     type: String,
     required: true,
     trim: true,
-    minlength: 2,
-    maxlength: 80
+    minlength: 3,
+    maxlength: 120
   },
   price: {
     type: Number,
