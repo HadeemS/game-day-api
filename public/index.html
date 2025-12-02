@@ -8,6 +8,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="styles.css" />
+  <!-- React and ReactDOM from CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <!-- Babel Standalone for JSX transformation -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
   <script>
     // Auto-detect if on GitHub Pages and use Render API, otherwise use relative paths for local dev
     if(window.location.hostname.includes('github.io') || window.location.hostname.includes('github.com')){
@@ -91,254 +96,67 @@
       </div>
     </header>
 
-    <section class="content-grid">
-      <section class="panel">
-        <div class="panel__header">
-          <h2>Post a marquee matchup</h2>
-          <p class="muted">Client-side checks mirror your server rules.</p>
-        </div>
-        <form id="add-form" class="form-grid" novalidate>
-          <label>Matchup Title<input name="title" placeholder="Lakers vs Celtics" required /></label>
-          <label>League
-            <select name="league">
-              <option>NBA</option><option>NFL</option><option>NCAA Football</option><option>MLB</option><option>MLS</option>
-            </select>
-          </label>
-          <label>Date<input type="date" name="date" required /></label>
-          <label>Time<input type="time" name="time" required /></label>
-          <label>Venue<input name="venue" placeholder="Crypto.com Arena" required /></label>
-          <label>City<input name="city" placeholder="Los Angeles, CA" required /></label>
-          <label>Starting Price (USD)<input type="number" name="price" min="0" step="1" value="0" required /></label>
-          <label class="full">Image path<input name="img" placeholder="/images/usc-vs-clemson.jpg" required /></label>
-          <label class="full">Image URL<input name="imageUrl" placeholder="/images/usc-vs-clemson.jpg or https://example.com/image.jpg" required /></label>
-          <label class="full">Summary<textarea rows="3" name="summary" placeholder="What makes this matchup must-see TV?" required></textarea></label>
-          <div class="form-footer">
-            <span id="status" class="status" style="display:none"></span>
-            <button type="submit">Share this game</button>
-          </div>
-        </form>
-      </section>
-
-      <section class="panel list-panel">
-        <div class="panel__header">
-          <h2>Upcoming spotlight games</h2>
-          <p class="muted">Every time you post, the schedule updates instantly.</p>
-        </div>
-        <div id="list" class="games-grid"></div>
-        <p id="list-error" class="alert" style="display:none"></p>
-      </section>
-    </section>
+    <!-- React App Root -->
+    <div id="react-root"></div>
   </main>
 
-  <script>
+  <!-- GameForm React Component -->
+  <script type="text/babel" src="GameForm.jsx"></script>
+  
+  <!-- Initialize and Mount React App -->
+  <script type="text/babel">
+    const { createRoot } = ReactDOM;
     const API_BASE = window.__GAME_DAY_API_BASE__ || window.location.origin;
 
-    function $(sel){ return document.querySelector(sel); }
-    function el(tag, props={}, children=[]){
-      const n = document.createElement(tag);
-      Object.entries(props).forEach(([k,v]) => {
-        if (k === 'class') n.className = v;
-        else if (k === 'text') n.textContent = v;
-        else n.setAttribute(k, v);
-      });
-      children.forEach(c => n.appendChild(c));
-      return n;
-    }
+    // Helper function for JSON preview
+    function $(sel) { return document.querySelector(sel); }
 
-    function fmtDate(s){
-      if(!s) return "";
-      const d = new Date(s + "T00:00:00");
-      return isNaN(d) ? s : d.toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric",year:"numeric"});
-    }
-    function fmtMoney(n){ return "$" + Number(n||0).toLocaleString("en-US"); }
-
-    async function loadJSON(){
-      try{
+    async function loadJSON() {
+      try {
         const r = await fetch(API_BASE + "/api/games");
         const data = await r.json();
-        $("#json-pretty").textContent = JSON.stringify(data, null, 2);
-        renderList(data);
-        // fix the iframe + links to use correct base
-        $("#json-frame").src = API_BASE + "/api/games";
-        $("#link-all").href = API_BASE + "/api/games";
-        $("#link-post").href = API_BASE + "/api/games";
-        $("#link-one").href = API_BASE + "/api/games/1";
-      }catch(e){
-        $("#json-pretty").textContent = "Failed to load JSON.";
-        $("#list-error").style.display = "";
-        $("#list-error").textContent = "Unable to load games.";
-      }
-    }
-
-    function resolveImageUrl(game){
-      const candidate = game.imageUrl || game.img || "";
-      if (!candidate) return "";
-      const lower = candidate.toLowerCase();
-      if (lower.startsWith("http://") || lower.startsWith("https://")) {
-        return candidate;
-      }
-      return API_BASE + candidate;
-    }
-
-    function renderList(items){
-      const list = $("#list");
-      list.innerHTML = "";
-      items.sort((a,b)=> new Date(a.date+"T"+a.time) - new Date(b.date+"T"+b.time));
-      items.forEach(g => {
-        const card = el("article",{class:"card"},[
-          (() => {
-            const wrap = el("div",{style:"position:relative"});
-            const imageSrc = resolveImageUrl(g);
-            wrap.append(
-              el("img",{src: imageSrc, alt: g.title, loading:"lazy"}),
-              el("span",{class:"badge", text: g.league})
-            );
-            return wrap;
-          })(),
-          (() => {
-            const body = el("div",{class:"card-body"});
-            body.append(
-              el("h3",{text:g.title}),
-              el("p",{class:"muted", text: `${fmtDate(g.date)} at ${g.time}`}),
-              el("p",{class:"muted", text: `${g.venue}, ${g.city}`}),
-              el("p",{text:g.summary}),
-              el("p",{class:"price", text: fmtMoney(g.price)})
-            );
-            return body;
-          })()
-        ]);
-        list.appendChild(card);
-      });
-    }
-
-    async function createGame(payload){
-      try {
-        const r = await fetch(API_BASE + "/api/games", {
-          method: "POST",
-          headers: {"Content-Type":"application/json"},
-          body: JSON.stringify(payload)
-        });
-        const data = await r.json().catch(()=>({error: "Failed to parse response"}));
-        if(!r.ok){
-          const msg = (data && (data.message || data.error)) || `Server error (${r.status})`;
-          const extra = (data && data.details && data.details.join(" ")) || "";
-          throw new Error(extra ? (msg + " " + extra) : msg);
+        if ($("#json-pretty")) {
+          $("#json-pretty").textContent = JSON.stringify(data, null, 2);
         }
-        return (data && (data.game || data.item)) || null;
-      } catch(err) {
-        // If it's a network error, provide more helpful message
-        if(err.name === "TypeError" && err.message.includes("fetch")) {
-          throw new Error(`Network error: Could not reach ${API_BASE}. Check if server is running.`);
+        // Fix the iframe + links to use correct base
+        if ($("#json-frame")) {
+          $("#json-frame").src = API_BASE + "/api/games";
         }
-        throw err;
-      }
-    }
-
-    function formStatus(type, msg){
-      const box = $("#status");
-      box.className = "status " + (type === "error" ? "err" : "ok");
-      box.textContent = msg;
-      box.style.display = "";
-      setTimeout(() => { box.style.display = "none"; }, 3000);
-    }
-
-    // Client-side validation matching server-side Joi schema
-    function validateGame(data){
-      const errors = [];
-      
-      // title: string().min(3).max(80).required()
-      if(!data.title || data.title.trim().length < 3 || data.title.trim().length > 80){
-        errors.push("Title must be 3-80 characters");
-      }
-      
-      // league: string().valid("NFL","NBA","NCAA Football","MLB","MLS").required()
-      const validLeagues = ["NFL", "NBA", "NCAA Football", "MLB", "MLS"];
-      if(!data.league || !validLeagues.includes(data.league)){
-        errors.push("League must be one of: NFL, NBA, NCAA Football, MLB, MLS");
-      }
-      
-      // date: string().pattern(/^\d{4}-\d{2}-\d{2}$/).required()
-      if(!data.date || !/^\d{4}-\d{2}-\d{2}$/.test(data.date)){
-        errors.push("Date must be in YYYY-MM-DD format");
-      }
-      
-      // time: string().pattern(/^\d{2}:\d{2}$/).required()
-      if(!data.time || !/^\d{2}:\d{2}$/.test(data.time)){
-        errors.push("Time must be in HH:MM format");
-      }
-      
-      // venue: string().min(2).max(80).required()
-      if(!data.venue || data.venue.trim().length < 2 || data.venue.trim().length > 80){
-        errors.push("Venue must be 2-80 characters");
-      }
-      
-      // city: string().min(2).max(80).required()
-      if(!data.city || data.city.trim().length < 2 || data.city.trim().length > 80){
-        errors.push("City must be 2-80 characters");
-      }
-      
-      // price: number().integer().min(0).max(10000).required()
-      const priceNum = Number(data.price);
-      if(isNaN(priceNum) || !Number.isInteger(priceNum) || priceNum < 0 || priceNum > 10000){
-        errors.push("Price must be an integer between 0 and 10000");
-      }
-      
-      // img: string().pattern(/^(https?:\/\/|\/)/i).required() - more flexible
-      if(!data.img || !/^(https?:\/\/|\/)/i.test(data.img.trim())){
-        errors.push("Image path must start with http://, https://, or /");
-      }
-      
-      // imageUrl: string().pattern(/^(https?:\/\/[^\s]+|\/[^\s]+\.(png|jpg|jpeg|webp|gif)$)/i).required()
-      if(!data.imageUrl || !/^(https?:\/\/[^\s]+|\/[^\s]+\.(png|jpg|jpeg|webp|gif)$)/i.test(data.imageUrl.trim())){
-        errors.push("Image URL must be a full URL (http:// or https://) or a relative path ending with .png, .jpg, .jpeg, .webp, or .gif");
-      }
-      
-      // summary: string().min(5).max(240).required()
-      if(!data.summary || data.summary.trim().length < 5 || data.summary.trim().length > 240){
-        errors.push("Summary must be 5-240 characters");
-      }
-      
-      return errors.length > 0 ? errors : null;
-    }
-
-    $("#refresh").addEventListener("click", loadJSON);
-
-    $("#add-form").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const fd = new FormData(e.currentTarget);
-      const payload = {
-        title: fd.get("title")?.trim() || "",
-        league: fd.get("league") || "NBA",
-        date: fd.get("date") || "",
-        time: fd.get("time") || "", // HTML5 time input returns HH:MM format
-        venue: fd.get("venue")?.trim() || "",
-        city: fd.get("city")?.trim() || "",
-        price: Math.floor(Number(fd.get("price") || 0)), // Ensure integer
-        img: (fd.get("img") || "").trim(),
-        imageUrl: (fd.get("imageUrl") || "").trim(),
-        summary: fd.get("summary")?.trim() || ""
-      };
-      
-      // Client-side validation
-      const validationErrors = validateGame(payload);
-      if(validationErrors){
-        formStatus("error", validationErrors.join(". "));
-          return;
+        if ($("#link-all")) $("#link-all").href = API_BASE + "/api/games";
+        if ($("#link-post")) $("#link-post").href = API_BASE + "/api/games";
+        if ($("#link-one")) $("#link-one").href = API_BASE + "/api/games/1";
+      } catch (e) {
+        if ($("#json-pretty")) {
+          $("#json-pretty").textContent = "Failed to load JSON.";
         }
-
-      try{
-        const created = await createGame(payload);
-        formStatus("ok","Game posted successfully!");
-        await loadJSON(); // refresh list + pretty JSON
-        // reset some fields
-        e.currentTarget.reset();
-      }catch(err){
-        formStatus("error", err.message);
       }
-    });
+    }
 
-    // initial load
+    // Refresh button handler
+    if ($("#refresh")) {
+      $("#refresh").addEventListener("click", loadJSON);
+    }
+
+    // Initial JSON load
     loadJSON();
+
+    // Wait for GameForm component to load, then mount React App
+    function mountApp() {
+      if (typeof App !== 'undefined') {
+        const root = createRoot(document.getElementById('react-root'));
+        root.render(React.createElement(App));
+      } else {
+        // Retry after a short delay if component hasn't loaded yet
+        setTimeout(mountApp, 100);
+      }
+    }
+
+    // Start mounting when DOM is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', mountApp);
+    } else {
+      mountApp();
+    }
   </script>
 </body>
 </html>
