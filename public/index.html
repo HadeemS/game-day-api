@@ -170,6 +170,16 @@
       }
     }
 
+    function resolveImageUrl(game){
+      const candidate = game.imageUrl || game.img || "";
+      if (!candidate) return "";
+      const lower = candidate.toLowerCase();
+      if (lower.startsWith("http://") || lower.startsWith("https://")) {
+        return candidate;
+      }
+      return API_BASE + candidate;
+    }
+
     function renderList(items){
       const list = $("#list");
       list.innerHTML = "";
@@ -178,8 +188,9 @@
         const card = el("article",{class:"card"},[
           (() => {
             const wrap = el("div",{style:"position:relative"});
+            const imageSrc = resolveImageUrl(g);
             wrap.append(
-              el("img",{src: g.imageUrl || g.img, alt: g.title, loading:"lazy"}),
+              el("img",{src: imageSrc, alt: g.title, loading:"lazy"}),
               el("span",{class:"badge", text: g.league})
             );
             return wrap;
