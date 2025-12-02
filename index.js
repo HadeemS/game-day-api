@@ -1,152 +1,77 @@
-// index.js
-const express = require("express");
-const cors = require("cors");
-const path = require("path");
-const Joi = require("joi");
-const connectDB = require("./db");
-const Game = require("./models/Game");
+/**
+ * Main Express Server File
+ * 
+ * This is your main server file that ties everything together.
+ * Replace your existing server.js/index.js with this code.
+ */
 
-// Connect to MongoDB
-connectDB();
+require('dotenv').config() // Load environment variables from .env file
+const express = require('express')
+const cors = require('cors')
+const path = require('path')
+const mongoose = require('mongoose')
+const db = require('./db') // MongoDB connection
+const connectDB = db.connectDB // Get connectDB function
+const gamesRoutes = require('./routes/games')
 
-const app = express();
-app.use(cors());
-app.use(express.json());
-app.use(express.static(path.join(__dirname, "public"))); // serve landing + /images
+const app = express()
+const PORT = process.env.PORT || 3000
 
-// --- Validation schema (matches Mongoose schema and client) ---
-const gameSchema = Joi.object({
-  title: Joi.string().min(3).max(80).required(),
-  league: Joi.string().valid("NFL","NBA","NCAA Football","MLB","MLS").required(),
-  date: Joi.string().pattern(/^\d{4}-\d{2}-\d{2}$/).required(),
-  time: Joi.string().pattern(/^\d{2}:\d{2}$/).required(),
-  venue: Joi.string().min(2).max(80).required(),
-  city: Joi.string().min(2).max(80).required(),
-  price: Joi.number().integer().min(0).max(10000).required(),
-  img: Joi.string().pattern(/^\/images\/[a-z0-9._\-]+\.(png|jpg|jpeg|webp)$/i).required(),
-  imageUrl: Joi.string().pattern(/^(https?:\/\/[^\s]+|\/[^\s]+\.(png|jpg|jpeg|webp|gif)$)/i).required(),
-  summary: Joi.string().min(5).max(240).required()
-});
+// Middleware
+app.use(cors())
+app.use(express.json())
+app.use(express.static(path.join(__dirname, 'public'))) // Serve landing page + images
 
-// --- Routes ---
-app.get("/api", (_req, res) => {
+// API Routes
+app.use('/api/games', gamesRoutes)
+
+// API info route
+app.get('/api', (req, res) => {
   res.json({
-    routes: [
-      { method: "GET", path: "/api/games" },
-      { method: "GET", path: "/api/games/:id" },
-      { method: "POST", path: "/api/games" },
-      { method: "PUT", path: "/api/games/:id" },
-      { method: "DELETE", path: "/api/games/:id" }
-    ]
-  });
-});
+    message: 'Game Day API - MongoDB Version',
+    endpoints: {
+      'GET /api/games': 'Get all games',
+      'GET /api/games/:id': 'Get a single game',
+      'POST /api/games': 'Create a new game',
+      'PUT /api/games/:id': 'Update a game',
+      'DELETE /api/games/:id': 'Delete a game',
+    },
+    database: 'MongoDB (Mongoose)',
+    validation: 'Joi + Mongoose',
+  })
+})
 
-// GET all games
-app.get("/api/games", async (_req, res) => {
+// Health check route (useful for Render)
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'ok', 
+    database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected' 
+  })
+})
+
+// Root route - serve landing page
+app.get('/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'index.html'))
+})
+
+// Start server only after MongoDB connection is established
+async function startServer() {
   try {
-    const games = await Game.find({});
-    res.json(games);
-  } catch (error) {
-    res.status(500).json({ error: "Failed to fetch games", message: error.message });
-  }
-});
-
-// GET single game by ID
-app.get("/api/games/:id", async (req, res) => {
-  try {
-    const game = await Game.findById(req.params.id);
-    if (!game) {
-      return res.status(404).json({ error: "Game not found" });
-    }
-    res.json(game);
-  } catch (error) {
-    res.status(500).json({ error: "Failed to fetch game", message: error.message });
-  }
-});
-
-// POST - Create new game
-app.post("/api/games", async (req, res) => {
-  // Validate with Joi first
-  const { error, value } = gameSchema.validate(req.body, { abortEarly: false });
-  if (error) {
-    return res.status(400).json({
-      ok: false,
-      message: "Validation failed",
-      details: error.details.map(d => d.message)
-    });
-  }
-
-  try {
-    // Create new game in MongoDB
-    const game = new Game(value);
-    const savedGame = await game.save();
-    res.status(201).json({ ok: true, game: savedGame });
-  } catch (error) {
-    res.status(500).json({
-      ok: false,
-      error: "Failed to create game",
-      message: error.message
-    });
-  }
-});
-
-// PUT - Update existing game
-app.put("/api/games/:id", async (req, res) => {
-  // Validate with Joi first
-  const { error, value } = gameSchema.validate(req.body, { abortEarly: false });
-  if (error) {
-    return res.status(400).json({
-      ok: false,
-      message: "Validation failed",
-      details: error.details.map(d => d.message)
-    });
-  }
-
-  try {
-    // Find and update game in MongoDB
-    const game = await Game.findByIdAndUpdate(
-      req.params.id,
-      value,
-      { new: true, runValidators: true }
-    );
+    // Wait for MongoDB connection before starting server
+    await connectDB()
     
-    if (!game) {
-      return res.status(404).json({ ok: false, error: "Game not found" });
-    }
-    
-    res.status(200).json({ ok: true, game });
+    app.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`)
+      console.log(`📊 MongoDB connection status: Connected`)
+    })
   } catch (error) {
-    res.status(500).json({
-      ok: false,
-      error: "Failed to update game",
-      message: error.message
-    });
+    console.error('Failed to start server:', error)
+    process.exit(1)
   }
-});
+}
 
-// DELETE - Remove game
-app.delete("/api/games/:id", async (req, res) => {
-  try {
-    const game = await Game.findByIdAndDelete(req.params.id);
-    
-    if (!game) {
-      return res.status(404).json({ ok: false, error: "Game not found" });
-    }
-    
-    res.status(200).json({ ok: true, game });
-  } catch (error) {
-    res.status(500).json({
-      ok: false,
-      error: "Failed to delete game",
-      message: error.message
-    });
-  }
-});
+// Start the server
+startServer()
 
-// Landing
-app.get("/", (_req, res) =>
-  res.sendFile(path.join(__dirname, "public", "index.html"))
-);
+module.exports = app
 
-const PORT = process.env.PORT || 3001;
-app.listen(PORT, () => console.log(`API listening on ${PORT}`));
