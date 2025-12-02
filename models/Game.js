@@ -1,4 +1,8 @@
-// models/Game.js
+/**
+ * Game Mongoose Model
+ * Defines the schema and model for game documents in MongoDB
+ */
+
 const mongoose = require("mongoose");
 
 const gameSchema = new mongoose.Schema({
@@ -57,7 +61,6 @@ const gameSchema = new mongoose.Schema({
     type: String,
     required: true,
     trim: true,
-    // Allow full URLs (http/https) or relative paths starting with /
     match: /^(https?:\/\/[^\s]+|\/[^\s]+\.(png|jpg|jpeg|webp|gif)$)/i
   },
   summary: {

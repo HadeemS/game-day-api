@@ -283,9 +283,9 @@
         errors.push("Price must be an integer between 0 and 10000");
       }
       
-      // img: string().pattern(/^\/images\/[a-z0-9._\-]+\.(png|jpg|jpeg|webp)$/i).required()
-      if(!data.img || !/^\/images\/[a-z0-9._\-]+\.(png|jpg|jpeg|webp)$/i.test(data.img.trim())){
-        errors.push("Image must be a path like /images/filename.png (png, jpg, jpeg, or webp)");
+      // img: string().pattern(/^(https?:\/\/|\/)/i).required() - more flexible
+      if(!data.img || !/^(https?:\/\/|\/)/i.test(data.img.trim())){
+        errors.push("Image path must start with http://, https://, or /");
       }
       
       // imageUrl: string().pattern(/^(https?:\/\/[^\s]+|\/[^\s]+\.(png|jpg|jpeg|webp|gif)$)/i).required()

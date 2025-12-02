@@ -1,3 +1,8 @@
+/**
+ * Games API Routes
+ * Handles all CRUD operations for games with Joi validation
+ */
+
 const express = require("express");
 const Joi = require("joi");
 const Game = require("../models/Game");
@@ -15,7 +20,7 @@ const gameSchema = Joi.object({
   city: Joi.string().min(2).max(80).required(),
   price: Joi.number().integer().min(0).max(10000).required(),
   img: Joi.string()
-    .pattern(/^\/images\/[a-z0-9._\-]+\.(png|jpg|jpeg|webp)$/i)
+    .pattern(/^(https?:\/\/|\/)/i) // More flexible: just needs to start with http://, https://, or /
     .required(),
   imageUrl: Joi.string()
     .pattern(/^(https?:\/\/[^\s]+|\/[^\s]+\.(png|jpg|jpeg|webp|gif)$)/i)
@@ -99,8 +104,7 @@ router.put("/:id", async (req, res) => {
     return res.status(400).json({
       ok: false,
       message: "Validation failed",
-      details: formatJoiErrors(error),
-      received: cleanBody // Include what was received for debugging
+      details: formatJoiErrors(error)
     });
   }
 
